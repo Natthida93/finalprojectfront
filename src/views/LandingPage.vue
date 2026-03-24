@@ -4,7 +4,7 @@ import MainLayout from '../components/layouts/MainLayOut.vue'
 import RecommendSection from '../components/sections/RecommendSection.vue'
 import ConcertFestivalSection from '../components/sections/ConcertFestivalSection.vue'
 import BookingModal from '../views/BookingPage.vue'
-
+import Hero from '../components/Hero.vue'
 // Events
 const events = ref([])
 
@@ -37,30 +37,31 @@ function closeBooking() {
 </script>
 
 <template>
-  <MainLayout>
-    <section class="hero">
-      Hero goes here
-    </section>
+ <MainLayout>
+  <!-- Hero Section -->
+  <Hero />
 
-    <!-- Sections -->
-    <RecommendSection 
-      :events="events"
-      @buyNow="openBooking"
-      @viewDetails="openBooking"
-    />
-    <ConcertFestivalSection 
-      :events="events"
-      @buyNow="openBooking"
-      @viewDetails="openBooking"
-    />
+  <!-- Sections -->
+  <RecommendSection 
+    :events="events"
+    @buyNow="openBooking"
+    @viewDetails="openBooking"
+  />
+  <ConcertFestivalSection 
+    :events="events"
+    @buyNow="openBooking"
+    @viewDetails="openBooking"
+  />
 
-    <!-- Booking Modal -->
-    <BookingModal
-      v-if="showBookingModal"
-      :event="selectedEvent"
-      :show="showBookingModal"
-      @close="closeBooking"
-      @proceedToPayment="closeBooking"
-    />
-  </MainLayout>
+  <!-- Booking Modal -->
+  <BookingModal
+    v-if="showBookingModal"
+    :event="selectedEvent"
+    :show="showBookingModal"
+    @close="closeBooking"
+    @proceedToPayment="closeBooking"
+  />
+</MainLayout>
 </template>
+
+

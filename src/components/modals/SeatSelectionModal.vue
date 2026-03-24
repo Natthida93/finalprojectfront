@@ -43,8 +43,7 @@
         <button
           @click="confirmBooking"
           :disabled="!selectedSeats.length"
-        >
-          Pay
+        > Pay
         </button>
         <button @click="closeModal">Cancel</button>
       </div>

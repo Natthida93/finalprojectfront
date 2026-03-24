@@ -54,3 +54,44 @@ const logout = () => {
     </div>
   </div>
 </template>
+
+
+<style scoped>
+.header {
+  display: flex;
+  justify-content: space-between; /* logo left, buttons right */
+  align-items: center;
+  padding: 10px 20px;
+  background-color: #000;
+  color: white;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 12px; /* spacing between language & buttons */
+}
+
+/* Buttons styling */
+.right button {
+  background: black;   /* black button */
+  color: white;        /* white text */
+  border: 2px solid white;
+  border-radius: 6px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.right button:hover {
+  background: white;   /* invert on hover */
+  color: black;
+  transform: scale(1.05);
+}
+
+/* Optional: router-link buttons remove underline */
+.right a {
+  text-decoration: none;
+}
+</style>

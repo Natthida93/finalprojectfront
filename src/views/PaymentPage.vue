@@ -1,4 +1,4 @@
-<template>
+<template> 
   <div class="payment-page">
     <h2 v-if="concert?.title">Payment for {{ concert.title }}</h2>
     <h2 v-else>Loading concert info...</h2>
@@ -36,10 +36,22 @@
       Payment time expired. Seats released.
     </div>
 
+    <!-- QR SECTION -->
+    <div v-if="qrCode" class="qr-section">
+      <h3>Scan to Pay</h3>
+      <canvas ref="qrCanvas"></canvas>
+      <p>Use Alipay to scan this QR</p>
+
+      <!-- ✅ NEW: QR Expiry -->
+      <p class="qr-expire">
+        QR expires in: {{ qrMinutes }}:{{ qrSeconds }}
+      </p>
+    </div>
+
     <!-- Pay button -->
     <button
       @click="proceedToPayment"
-      :disabled="timeLeft <= 0 || paymentProcessing || !selectedSeats.length"
+      :disabled="timeLeft <= 0 || paymentProcessing || !selectedSeats.length || qrCode"
     >
       <span v-if="paymentProcessing">Processing...</span>
       <span v-else>Pay with Alipay</span>
@@ -48,10 +60,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from "vue"
+import { ref, computed, onMounted, onUnmounted, nextTick } from "vue"
 import { useRouter } from "vue-router"
 import axios from "axios"
 import OrderSummary from "../views/OrderSummary.vue"
+import QRCode from "qrcode"
 
 const router = useRouter()
 
@@ -64,7 +77,15 @@ const paymentProcessing = ref(false)
 const userEmail = ref(localStorage.getItem("userEmail") || "")
 const userId = Number(localStorage.getItem("userId"))
 
-// Countdown
+const qrCode = ref(null)
+const qrCanvas = ref(null)
+let paymentId = null
+
+// ⏱ QR expiry timer (NEW)
+const qrTimeLeft = ref(120)
+let qrTimer = null
+
+// Seat countdown
 const timeLeft = ref(5 * 60)
 let timer = null
 let pollingInterval = null
@@ -75,6 +96,14 @@ const minutes = computed(() =>
 
 const seconds = computed(() =>
   String(timeLeft.value % 60).padStart(2, "0")
+)
+
+const qrMinutes = computed(() =>
+  String(Math.floor(qrTimeLeft.value / 60)).padStart(2, "0")
+)
+
+const qrSeconds = computed(() =>
+  String(qrTimeLeft.value % 60).padStart(2, "0")
 )
 
 const totalPrice = computed(() =>
@@ -88,19 +117,16 @@ async function fetchUserInfo() {
     const res = await axios.get("http://localhost:8081/users/info", {
       params: { email: userEmail.value }
     })
-    console.log("[PaymentPage] User info:", res.data)
     userAddress.value = res.data.address || "Address not set"
-  } catch (err) {
-    console.error("[PaymentPage] Failed to fetch user info:", err)
+  } catch {
     userAddress.value = "Address not available"
   }
 }
 
 async function releaseSeats() {
-  console.log("[PaymentPage] Releasing seats...")
-
   clearInterval(timer)
   clearInterval(pollingInterval)
+  clearInterval(qrTimer)
 
   try {
     await Promise.all(
@@ -110,8 +136,6 @@ async function releaseSeats() {
         })
       )
     )
-  } catch (err) {
-    console.error("[PaymentPage] Failed to release seats:", err)
   } finally {
     selectedSeats.value = []
     localStorage.removeItem("paymentSeats")
@@ -120,6 +144,30 @@ async function releaseSeats() {
   }
 }
 
+// ---------------- CREATE QR ----------------
+async function createQR() {
+  const seatIds = selectedSeats.value.map(s => s.id)
+
+  const res = await axios.post("http://localhost:8081/payment/create", {
+    concertId: concert.value.id,
+    userId,
+    seatIds,
+    deliveryMethod: deliveryMethod.value
+  })
+
+  qrCode.value = res.data.qrCode
+  paymentId = res.data.paymentId
+
+  localStorage.setItem("latestPaymentId", paymentId)
+
+  await nextTick()
+  QRCode.toCanvas(qrCanvas.value, qrCode.value)
+
+  startPolling(paymentId)
+  startQrTimer()
+}
+
+// ---------------- PAY ----------------
 async function proceedToPayment() {
   if (!concert.value || !selectedSeats.value.length) return
   if (timeLeft.value <= 0 || paymentProcessing.value) return
@@ -127,83 +175,58 @@ async function proceedToPayment() {
   paymentProcessing.value = true
 
   try {
-    const seatIds = selectedSeats.value.map(s => s.id)
-
-    const resPayment = await axios.post(
-      "http://localhost:8081/payment/create",
-      {
-        concertId: concert.value.id,
-        userId,
-        seatIds,
-        deliveryMethod: deliveryMethod.value
-      },
-      { responseType: "text" }
-    )
-
-    const parser = new DOMParser()
-    const doc = parser.parseFromString(resPayment.data, "text/html")
-    const form = doc.querySelector("form")
-
-    if (!form) throw new Error("Payment form not found")
-
-    const paymentInput = form.querySelector('input[name="paymentId"]')
-    const paymentId = paymentInput ? paymentInput.value : null
-
-    if (paymentId) {
-      localStorage.setItem("latestPaymentId", paymentId)
-      startPolling(paymentId)
-    }
-
-    // submit form
-    const tempForm = document.createElement("form")
-    tempForm.method = form.method || "POST"
-    tempForm.action = form.action
-    tempForm.target = "_self"
-
-    Array.from(form.querySelectorAll("input")).forEach(input => {
-      const hidden = document.createElement("input")
-      hidden.type = "hidden"
-      hidden.name = input.name
-      hidden.value = input.value
-      tempForm.appendChild(hidden)
-    })
-
-    document.body.appendChild(tempForm)
-    tempForm.submit()
-
+    await createQR()
   } catch (err) {
     console.error("[PaymentPage] Payment error:", err)
-    alert("Payment failed. Please try again.")
+    alert("Payment failed.")
   } finally {
     paymentProcessing.value = false
   }
 }
 
+// ---------------- QR TIMER ----------------
+function startQrTimer() {
+  qrTimeLeft.value = 120
+
+  if (qrTimer) clearInterval(qrTimer)
+
+  qrTimer = setInterval(() => {
+    qrTimeLeft.value--
+
+    if (qrTimeLeft.value <= 0) {
+      clearInterval(qrTimer)
+      console.log("[QR] expired → refreshing...")
+      refreshQR()
+    }
+  }, 1000)
+}
+
+// ---------------- REFRESH QR ----------------
+async function refreshQR() {
+  try {
+    await createQR()
+  } catch (err) {
+    console.error("[QR] refresh failed:", err)
+  }
+}
+
 // ---------------- POLLING ----------------
-function startPolling(paymentId) {
-  if (!paymentId) return
+function startPolling(id) {
+  if (!id) return
 
   if (pollingInterval) clearInterval(pollingInterval)
 
   pollingInterval = setInterval(async () => {
     try {
-      const res = await axios.get("http://localhost:8081/payment/pending", {
-        params: {
-          userId,
-          concertId: concert.value?.id
-        }
-      })
+      const res = await axios.get(`http://localhost:8081/payment/status/${id}`)
 
-      const completedPayment = res.data.find(
-        p => p.id == paymentId && p.status === "COMPLETED"
-      )
-
-      if (completedPayment) {
+      if (res.data === "COMPLETED") {
         clearInterval(pollingInterval)
+        clearInterval(qrTimer)
         router.push("/booking-success")
       }
     } catch (err) {
-      console.error("[Polling] failed:", err)
+      console.error("[Polling] error:", err)
     }
   }, 3000)
 }
@@ -219,7 +242,6 @@ onMounted(() => {
     axios
       .get(`http://localhost:8081/api/concerts/${concertIdStored}`)
       .then(res => (concert.value = res.data))
-      .catch(err => console.error("[PaymentPage] Failed to fetch concert:", err))
   }
 
   fetchUserInfo()
@@ -233,6 +255,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (timer) clearInterval(timer)
   if (pollingInterval) clearInterval(pollingInterval)
+  if (qrTimer) clearInterval(qrTimer)
 })
 </script>
 
@@ -241,6 +264,17 @@ onUnmounted(() => {
   max-width: 600px;
   margin: auto;
   padding: 20px;
+}
+
+.qr-section {
+  margin: 20px 0;
+  text-align: center;
+}
+
+.qr-expire {
+  margin-top: 10px;
+  color: #ff6b6b;
+  font-weight: bold;
 }
 
 .countdown {
@@ -265,16 +299,9 @@ button {
 
 button:disabled {
   background: #ccc;
-  cursor: not-allowed;
 }
 
 .delivery-option {
   margin: 12px 0;
-}
-
-.delivery-option label {
-  display: block;
-  margin: 6px 0;
-  font-weight: bold;
 }
 </style>

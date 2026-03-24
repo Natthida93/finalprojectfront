@@ -7,7 +7,8 @@ import BookingPage from "../views/BookingPage.vue"
 import PaymentPage from "../views/PaymentPage.vue"
 import BookingHistoryPage from "../views/BookingHistoryPage.vue"
 import EventDetail from '../components/events/EventDetail.vue'
-import BookingSuccessPage from '../views/BookingSuccessPage.vue' 
+import BookingSuccessPage from '../views/BookingSuccessPage.vue'
+import AllEventsPage from '../views/AllEventsPage.vue' 
 
 const routes = [
   { path: '/', name: 'LandingPage', component: LandingPage },
@@ -18,7 +19,12 @@ const routes = [
   { path: '/payment', name: 'payment', component: PaymentPage },
   { path: '/history', name: 'history', component: BookingHistoryPage },
   { path: '/event/:id', name: 'eventDetail', component: EventDetail },
-  { path: '/booking-success/:concertId', name: 'BookingSuccess', component: BookingSuccessPage } // <-- New route
+ { path: '/booking-success', name: 'BookingSuccess', component: BookingSuccessPage },
+  {
+  path: '/events',
+  name: 'AllEvents',
+  component: () => import('../views/AllEventsPage.vue')
+}
 ]
 
 const router = createRouter({
