@@ -1,26 +1,40 @@
 <template>
   <div class="booking-history-page">
-    <h2>Your Booking History</h2>
+    <h2>Purchase History</h2>
 
     <div v-if="bookings.length">
-      <div v-for="(b, index) in bookings" :key="index" class="history-item">
+      
+      <div
+        v-for="(b, index) in bookings"
+        :key="index"
+        class="history-item"
+      >
         <h3>{{ b.concertName }} - {{ b.concertDate }}</h3>
 
+        <!-- use seatNumbers -->
         <ul class="seat-list">
-          <li v-for="seat in b.seats" :key="seat.seatNumber">
-            {{ seat.section }} - Seat {{ seat.seatNumber }} - ${{ seat.price }}
+          <li v-for="seat in b.seatNumbers" :key="seat">
+            Seat {{ seat }}
           </li>
         </ul>
 
         <p><strong>Total Price:</strong> ${{ b.totalPrice }}</p>
         <p><strong>Status:</strong> {{ b.paymentStatus }}</p>
 
-        <!-- Alipay button & QR code -->
-        <div v-if="b.paymentStatus === 'PENDING'">
-          <button @click="payWithAlipay(b)">Pay with Alipay Sandbox</button>
+        <!--  show expiry -->
+        <p v-if="b.expiresAt && b.canContinuePayment">
+          ⏳ Expires at: {{ formatTime(b.expiresAt) }}
+        </p>
+
+        <!--  allow continue payment -->
+        <div v-if="b.canContinuePayment">
+          <button @click="payWithAlipay(b)">
+            Continue Payment
+          </button>
+
           <div v-if="b.alipayQrUrl" class="alipay-qr">
             <p>Scan QR to pay:</p>
-            <img :src="b.alipayQrUrl" alt="Alipay QR Code" />
+            <canvas :ref="el => setQrRef(el, b)"></canvas>
           </div>
         </div>
 
@@ -35,28 +49,33 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
-import axios from "axios";
+import { ref, onMounted } from "vue"
+import axios from "axios"
+import QRCode from "qrcode"
+import { nextTick } from "vue"
+
 
 // ------------------
-// ✅ Logged-in user
+// USER 
 // ------------------
-const storedUser = JSON.parse(localStorage.getItem("loggedInUser")) || {};
-const userId = ref(storedUser.id || null);
-const userEmail = ref(storedUser.email || "");
+const userId = ref(Number(localStorage.getItem("userId")))
+const userEmail = ref(localStorage.getItem("userEmail") || "")
 
-console.log("Logged-in user:", storedUser);
+const bookings = ref([])
+const qrRefs = new Map()
 
-const bookings = ref([]);
-
+const setQrRef = (el, booking) => {
+  if (el) {
+    qrRefs.set(booking.paymentId, el)
+  }
+}
 // ------------------
-// Fetch booking history
+// FETCH HISTORY
 // ------------------
 const fetchBookingHistory = async () => {
-  console.log("Fetching booking history for:", userEmail.value);
   if (!userEmail.value) {
-    console.error("No logged-in user found");
-    return;
+    console.error("No userEmail found")
+    return
   }
 
   try {
@@ -64,106 +83,166 @@ const fetchBookingHistory = async () => {
       `http://localhost:8081/bookings/history/${encodeURIComponent(
         userEmail.value
       )}`
-    );
+    )
 
-    console.log("Booking history response:", res.data);
+    console.log("Booking history:", res.data) 
 
     bookings.value = res.data.map((b) => ({
       ...b,
-      alipayQrUrl: null, // QR code URL
-      pollInterval: null, // Poll interval reference
-    }));
+      alipayQrUrl: null,
+      pollInterval: null,
+    }))
   } catch (err) {
-    console.error("Failed to fetch booking history:", err);
+    console.error("Failed to fetch booking history:", err)
   }
-};
+}
 
 // ------------------
-// Initiate Alipay payment
+// CONTINUE PAYMENT
 // ------------------
 const payWithAlipay = async (booking) => {
-  if (!booking.concertId || !userId.value) {
-    console.error("Missing concertId or userId:", booking, userId.value);
-    return;
+  // STOP if no seatIds (VERY IMPORTANT)
+  if (!booking.seatIds || booking.seatIds.length === 0) {
+    console.error("Missing seatIds for booking:", booking)
+    alert("Cannot continue payment: missing seat info")
+    return
   }
 
   try {
-    console.log("Initiating Alipay payment for booking:", booking);
-    const res = await axios.post("http://localhost:8081/bookings/alipay", {
+    const res = await axios.post("http://localhost:8081/payment/create", {
       userId: userId.value,
       concertId: booking.concertId,
-      price: booking.totalPrice,
-    });
+      seatIds: booking.seatIds, 
+      deliveryMethod: "CONCERT"
+    })
 
-    console.log("Alipay response:", res.data);
 
-    booking.alipayQrUrl = res.data.qrCodeUrl;
-    booking.paymentId = res.data.paymentId;
+    booking.alipayQrUrl = res.data.qrCode
+    booking.paymentId = res.data.paymentId
 
-    pollPaymentStatus(booking);
+    await nextTick()
+
+    const canvas = qrRefs.get(booking.paymentId)
+    if (canvas) {
+      QRCode.toCanvas(canvas, booking.alipayQrUrl)
+    }
+
+    pollPaymentStatus(booking)
+
   } catch (err) {
-    console.error("Failed to initiate Alipay payment:", err);
+    console.error("Payment failed:", err)
   }
-};
+}
 
 // ------------------
-// Poll payment status
+// POLLING (UNCHANGED LOGIC)
 // ------------------
-const pollPaymentStatus = async (booking) => {
-  if (!booking.paymentId) {
-    console.error("Cannot poll payment status, missing paymentId:", booking);
-    return;
-  }
-
-  console.log("Starting payment poll for paymentId:", booking.paymentId);
+const pollPaymentStatus = (booking) => {
+  if (!booking.paymentId) return
 
   booking.pollInterval = setInterval(async () => {
     try {
-      console.log("Polling payment status for:", booking.paymentId);
       const res = await axios.get(
-        `http://localhost:8081/bookings/by-payment/${booking.paymentId}`
-      );
+        `http://localhost:8081/payment/status/${booking.paymentId}`
+      )
 
-      console.log("Poll response:", res.data);
-
-      if (res.data?.payment?.status === "COMPLETED") {
-        booking.paymentStatus = "COMPLETED";
-        booking.alipayQrUrl = null;
-        clearInterval(booking.pollInterval);
-        console.log("Payment completed for:", booking.paymentId);
+      if (res.data === "COMPLETED") {
+        booking.paymentStatus = "COMPLETED"
+        booking.alipayQrUrl = null
+        clearInterval(booking.pollInterval)
       }
     } catch (err) {
-      console.error("Error checking payment status:", err);
+      console.error("Polling error:", err)
     }
-  }, 3000);
-};
+  }, 3000)
+}
 
-onMounted(fetchBookingHistory);
+// ------------------
+// FORMAT TIME
+// ------------------
+const formatTime = (time) => {
+  return new Date(time).toLocaleString()
+}
+
+// ------------------
+onMounted(fetchBookingHistory)
 </script>
 
 <style scoped>
 .booking-history-page {
   max-width: 900px;
-  margin: auto;
-  padding: 20px;
+  margin: 40px auto;
+  padding: 30px;
+  background: #f9f9f9; /* soft light background */
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  font-family: "Segoe UI", Roboto, sans-serif;
 }
 
 .history-item {
   margin-bottom: 30px;
+  padding: 20px;
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.history-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.history-item h3 {
+  margin-bottom: 12px;
+  color: #1e2a78;
+  font-size: 1.3rem;
 }
 
 .seat-list {
   list-style: none;
   padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .seat-list li {
-  margin: 2px 0;
+  background: #e0e7ff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.95rem;
+  color: #1e2a78;
 }
 
 .alipay-qr img {
-  margin-top: 10px;
-  width: 200px;
-  height: 200px;
+  margin-top: 12px;
+  width: 180px;
+  height: 180px;
+  border: 2px solid #1e2a78;
+  border-radius: 12px;
+}
+
+button {
+  padding: 10px 20px;
+  background: #1e2a78; /* rich dark blue */
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s, transform 0.2s;
+}
+
+button:hover {
+  background: #3b4bbf; /* lighter hover blue */
+  transform: translateY(-2px);
+}
+
+/* Optional: subtle divider between items */
+.history-item + .history-item {
+  margin-top: 20px;
+  border-top: 1px solid #e0e0e0;
 }
 </style>

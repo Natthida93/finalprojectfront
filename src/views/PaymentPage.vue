@@ -13,18 +13,39 @@
     />
 
     <!-- Ticket Delivery -->
-    <div class="delivery-option" v-if="userAddress">
+    <div class="delivery-option">
       <h3>Ticket Delivery</h3>
 
+      <!-- Receive at Concert Option -->
       <label>
         <input type="radio" value="CONCERT" v-model="deliveryMethod" />
         Receive at Concert
       </label>
 
+      <!-- Ship to Address Option -->
       <label>
         <input type="radio" value="SHIPPED" v-model="deliveryMethod" />
-        Ship to My Address ({{ userAddress }})
+        Ship to My Address
+        <span v-if="userAddress && userAddress !== 'Address not set' && userAddress !== 'Address not available'">
+          ({{ userAddress }})
+        </span>
+        <span v-else>(address not set)</span>
       </label>
+
+      <!-- Show delivery fee when shipped -->
+      <p v-if="deliveryMethod === 'SHIPPED'" class="delivery-fee">
+        ⚡ Shipping Fee: ${{ deliveryFee }}
+      </p>
+
+      <!-- Show address input when 'SHIPPED' is selected -->
+      <div v-if="deliveryMethod === 'SHIPPED'" class="shipping">
+        <input 
+          v-model="userAddress" 
+          placeholder="Enter or edit your shipping address" 
+        />
+        <button class="save-btn" @click="saveAddress" :disabled="!userAddress">Save Address</button>
+        <p v-if="showToast" class="save-message">Address saved!</p>
+      </div>
     </div>
 
     <!-- Countdown -->
@@ -42,7 +63,7 @@
       <canvas ref="qrCanvas"></canvas>
       <p>Use Alipay to scan this QR</p>
 
-      <!-- ✅ NEW: QR Expiry -->
+      <!-- QR Expiry -->
       <p class="qr-expire">
         QR expires in: {{ qrMinutes }}:{{ qrSeconds }}
       </p>
@@ -51,7 +72,7 @@
     <!-- Pay button -->
     <button
       @click="proceedToPayment"
-      :disabled="timeLeft <= 0 || paymentProcessing || !selectedSeats.length || qrCode"
+      :disabled="timeLeft <= 0 || paymentProcessing || !selectedSeats.length || qrCode || (deliveryMethod === 'SHIPPED' && !userAddress)"
     >
       <span v-if="paymentProcessing">Processing...</span>
       <span v-else>Pay with Alipay</span>
@@ -60,203 +81,202 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from "vue"
-import { useRouter } from "vue-router"
-import axios from "axios"
-import OrderSummary from "../views/OrderSummary.vue"
-import QRCode from "qrcode"
+import { ref, computed, onMounted, onUnmounted, nextTick } from "vue";
+import { useRouter } from "vue-router";
+import axios from "axios";
+import QRCode from "qrcode";
+import OrderSummary from "../views/OrderSummary.vue";
 
-const router = useRouter()
+const router = useRouter();
 
 // ---------------- STATE ----------------
-const concert = ref(null)
-const selectedSeats = ref([])
-const deliveryMethod = ref("CONCERT")
-const userAddress = ref("")
-const paymentProcessing = ref(false)
-const userEmail = ref(localStorage.getItem("userEmail") || "")
-const userId = Number(localStorage.getItem("userId"))
+const concert = ref(null);
+const selectedSeats = ref([]);
+const deliveryMethod = ref("CONCERT");  // Default is 'CONCERT'
+const userAddress = ref(""); // Store user's shipping address if applicable
+const paymentProcessing = ref(false);
+const userEmail = ref(localStorage.getItem("userEmail") || "");
+const userId = Number(localStorage.getItem("userId"));
 
-const qrCode = ref(null)
-const qrCanvas = ref(null)
-let paymentId = null
+const qrCode = ref(null);
+const qrCanvas = ref(null);
+let paymentId = null;
+const paymentStatus = ref(null);
 
-// ⏱ QR expiry timer (NEW)
-const qrTimeLeft = ref(120)
-let qrTimer = null
+const qrTimeLeft = ref(120);
+let qrTimer = null;
 
-// Seat countdown
-const timeLeft = ref(5 * 60)
-let timer = null
-let pollingInterval = null
+const timeLeft = ref(5 * 60);
+let timer = null;
+let pollingInterval = null;
 
-const minutes = computed(() =>
-  String(Math.floor(timeLeft.value / 60)).padStart(2, "0")
-)
-
-const seconds = computed(() =>
-  String(timeLeft.value % 60).padStart(2, "0")
-)
-
-const qrMinutes = computed(() =>
-  String(Math.floor(qrTimeLeft.value / 60)).padStart(2, "0")
-)
-
-const qrSeconds = computed(() =>
-  String(qrTimeLeft.value % 60).padStart(2, "0")
-)
+// ---------------- COMPUTED ----------------
+const deliveryFee = computed(() => (deliveryMethod.value === "SHIPPED" ? 50 : 0));
 
 const totalPrice = computed(() =>
-  selectedSeats.value.reduce((sum, seat) => sum + (seat?.price || 0), 0)
-)
+  selectedSeats.value.reduce((sum, seat) => sum + (seat?.price || 0), 0) + deliveryFee.value
+);
 
-// ---------------- FUNCTIONS ----------------
-async function fetchUserInfo() {
-  if (!userEmail.value) return
-  try {
-    const res = await axios.get("http://localhost:8081/users/info", {
-      params: { email: userEmail.value }
-    })
-    userAddress.value = res.data.address || "Address not set"
-  } catch {
-    userAddress.value = "Address not available"
-  }
+// ---------------- SAVE ADDRESS ----------------
+const showToast = ref(false);
+
+function saveAddress() {
+  if (!userAddress.value) return;
+
+  localStorage.setItem("userAddress", userAddress.value);
+
+  showToast.value = true;
+
+  setTimeout(() => {
+    showToast.value = false;
+  }, 2000);
 }
 
-async function releaseSeats() {
-  clearInterval(timer)
-  clearInterval(pollingInterval)
-  clearInterval(qrTimer)
+// ---------------- CREATE OR REFRESH QR ----------------
+async function createOrRefreshQR(isRefresh = false) {
+  if (!concert.value || !selectedSeats.value.length) return;
 
-  try {
-    await Promise.all(
-      selectedSeats.value.map(seat =>
-        axios.post("http://localhost:8081/api/seats/release", null, {
-          params: { seatId: seat.id }
-        })
-      )
-    )
-  } finally {
-    selectedSeats.value = []
-    localStorage.removeItem("paymentSeats")
-    localStorage.removeItem("paymentConcertId")
-    localStorage.removeItem("latestPaymentId")
-  }
-}
-
-// ---------------- CREATE QR ----------------
-async function createQR() {
-  const seatIds = selectedSeats.value.map(s => s.id)
-
-  const res = await axios.post("http://localhost:8081/payment/create", {
+  const payload = {
     concertId: concert.value.id,
     userId,
-    seatIds,
-    deliveryMethod: deliveryMethod.value
-  })
+    price: totalPrice.value,
+    seatIds: selectedSeats.value.map(s => s.id),
+    deliveryMethod: deliveryMethod.value,
+    shippingAddress: deliveryMethod.value === "SHIPPED" ? userAddress.value : null
+  };
 
-  qrCode.value = res.data.qrCode
-  paymentId = res.data.paymentId
+  const url = isRefresh
+    ? `http://localhost:8081/payment/refresh/${paymentId}`
+    : "http://localhost:8081/payment/create";
 
-  localStorage.setItem("latestPaymentId", paymentId)
+  try {
+    const res = await axios.post(url, payload);
+    qrCode.value = res.data.qrCode;
+    paymentId = res.data.paymentId;
+    paymentStatus.value = res.data.status;
+    localStorage.setItem("latestPaymentId", paymentId);
 
-  await nextTick()
-  QRCode.toCanvas(qrCanvas.value, qrCode.value)
+    if (paymentStatus.value === "COMPLETED") {
+      alert("Payment already completed!");
+      router.push("/booking-success");
+      return;
+    }
 
-  startPolling(paymentId)
-  startQrTimer()
+    await nextTick();
+    QRCode.toCanvas(qrCanvas.value, qrCode.value);
+
+    if (!isRefresh) startPolling(paymentId);
+    startQrTimer();
+  } catch (err) {
+    console.error("QR creation/refresh failed", err);
+    alert("Failed to generate QR code. Please try again.");
+  }
 }
 
 // ---------------- PAY ----------------
 async function proceedToPayment() {
-  if (!concert.value || !selectedSeats.value.length) return
-  if (timeLeft.value <= 0 || paymentProcessing.value) return
+  if (!concert.value || !selectedSeats.value.length) return;
+  if (timeLeft.value <= 0 || paymentProcessing.value) return;
+  if (paymentStatus.value === "COMPLETED") return;
 
-  paymentProcessing.value = true
+  paymentProcessing.value = true;
 
   try {
-    await createQR()
+    await createOrRefreshQR(false);
   } catch (err) {
-    console.error("[PaymentPage] Payment error:", err)
-    alert("Payment failed.")
+    console.error(err);
+    alert("Payment initiation failed");
   } finally {
-    paymentProcessing.value = false
+    paymentProcessing.value = false;
   }
 }
 
 // ---------------- QR TIMER ----------------
 function startQrTimer() {
-  qrTimeLeft.value = 120
-
-  if (qrTimer) clearInterval(qrTimer)
+  qrTimeLeft.value = 120;
+  if (qrTimer) clearInterval(qrTimer);
 
   qrTimer = setInterval(() => {
-    qrTimeLeft.value--
-
+    qrTimeLeft.value--;
     if (qrTimeLeft.value <= 0) {
-      clearInterval(qrTimer)
-      console.log("[QR] expired → refreshing...")
-      refreshQR()
+      clearInterval(qrTimer);
+      refreshQR();
     }
-  }, 1000)
+  }, 1000);
 }
 
 // ---------------- REFRESH QR ----------------
 async function refreshQR() {
+  if (paymentStatus.value === "COMPLETED") return;
   try {
-    await createQR()
-  } catch (err) {
-    console.error("[QR] refresh failed:", err)
+    await createOrRefreshQR(true);
+  } catch (e) {
+    console.error("QR refresh failed", e);
   }
 }
 
-// ---------------- POLLING ----------------
+// ---------------- POLLING PAYMENT STATUS ----------------
 function startPolling(id) {
-  if (!id) return
-
-  if (pollingInterval) clearInterval(pollingInterval)
+  if (pollingInterval) clearInterval(pollingInterval);
+  let pollTimeout = 5 * 60;
 
   pollingInterval = setInterval(async () => {
+    pollTimeout--;
+    if (pollTimeout <= 0) {
+      clearInterval(pollingInterval);
+      alert("Payment timeout. Please try again.");
+      return;
+    }
+
     try {
-      const res = await axios.get(`http://localhost:8081/payment/status/${id}`)
+      const res = await axios.get(`http://localhost:8081/payment/status/${id}`);
+      paymentStatus.value = res.data;
 
       if (res.data === "COMPLETED") {
-        clearInterval(pollingInterval)
-        clearInterval(qrTimer)
-        router.push("/booking-success")
+        clearInterval(pollingInterval);
+        clearInterval(qrTimer);
+        router.push("/booking-success");
+      } else if (res.data === "FAILED") {
+        clearInterval(pollingInterval);
+        clearInterval(qrTimer);
+        alert("Payment failed. Please try again.");
       }
     } catch (err) {
-      console.error("[Polling] error:", err)
+      console.error("Polling error", err);
     }
-  }, 3000)
+  }, 3000);
 }
 
-// ---------------- ON MOUNT ----------------
+// ---------------- INITIALIZATION ----------------
 onMounted(() => {
-  const seatsFromStorage = JSON.parse(localStorage.getItem("paymentSeats") || "[]")
-  selectedSeats.value = seatsFromStorage
+  selectedSeats.value = JSON.parse(localStorage.getItem("paymentSeats") || "[]");
+  const concertId = JSON.parse(localStorage.getItem("paymentConcertId") || "null");
 
-  const concertIdStored = JSON.parse(localStorage.getItem("paymentConcertId") || "null")
-
-  if (concertIdStored) {
-    axios
-      .get(`http://localhost:8081/api/concerts/${concertIdStored}`)
+  if (concertId) {
+    axios.get(`http://localhost:8081/api/concerts/${concertId}`)
       .then(res => (concert.value = res.data))
+      .catch(err => console.error("Failed to fetch concert", err));
   }
 
-  fetchUserInfo()
+  userAddress.value = localStorage.getItem("userAddress") || "";
 
   timer = setInterval(() => {
-    if (timeLeft.value > 0) timeLeft.value--
-    else releaseSeats()
-  }, 1000)
-})
+    if (timeLeft.value > 0) timeLeft.value--;
+  }, 1000);
+});
 
 onUnmounted(() => {
-  if (timer) clearInterval(timer)
-  if (pollingInterval) clearInterval(pollingInterval)
-  if (qrTimer) clearInterval(qrTimer)
-})
+  if (timer) clearInterval(timer);
+  if (pollingInterval) clearInterval(pollingInterval);
+  if (qrTimer) clearInterval(qrTimer);
+});
+
+// ---------------- COMPUTED MINUTES / SECONDS ----------------
+const minutes = computed(() => String(Math.floor(timeLeft.value / 60)).padStart(2, "0"));
+const seconds = computed(() => String(timeLeft.value % 60).padStart(2, "0"));
+
+const qrMinutes = computed(() => String(Math.floor(qrTimeLeft.value / 60)).padStart(2, "0"));
+const qrSeconds = computed(() => String(qrTimeLeft.value % 60).padStart(2, "0"));
 </script>
 
 <style scoped>
@@ -303,5 +323,35 @@ button:disabled {
 
 .delivery-option {
   margin: 12px 0;
+}
+
+.shipping {
+  margin-top: 8px;
+}
+
+.save-btn {
+  margin-left: 8px;
+  padding: 4px 12px;
+  background-color: #2ecc71;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.delivery-fee {
+  font-weight: bold;
+  color: #e67e22;
+  margin: 6px 0;
+}
+
+.toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: #2ecc71;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 8px;
 }
 </style>
