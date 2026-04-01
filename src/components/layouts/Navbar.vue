@@ -4,29 +4,29 @@ import AllEventsPage from '../../views/AllEventsPage.vue';
 
 <template>
   <nav class="navbar">
-    <a href="/">Home</a>
-    <a href="/events">Concerts</a>
-    <a href="/history">Purchase history</a>
+    <router-link to="/">Home</router-link>
+    <router-link to="/events">Concerts</router-link>
+    <router-link to="/history">Purchase history</router-link>
   </nav>
 </template>
 
 <style scoped>
 .navbar {
   display: flex;
-  justify-content: center; /* centers items horizontally */
-  gap: 40px;               /* space between links */
+  justify-content: center; 
+  gap: 40px;          
   padding: 10px 0;
   background: #222;
 }
 
 .navbar a {
-  color: white;            /* make links white */
-  text-decoration: none;   /* remove underline */
+  color: white;            
+  text-decoration: none;   
   font-weight: 500;
   transition: color 0.2s;
 }
 
 .navbar a:hover {
-  color: #ff6b6b;          /* optional hover color for effect */
+  color: #ff6b6b;          
 }
 </style>
