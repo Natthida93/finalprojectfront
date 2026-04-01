@@ -79,7 +79,7 @@ async function fetchSeats() {
   loading.value = true
   try {
     const res = await axios.get(
-      `http://localhost:8081/api/seats/concert/${props.concertId}/zone`,
+      `https://thesisproject-pqtl.onrender.com/api/seats/concert/${props.concertId}/zone`,
       { params: { zoneName: props.zoneName } }
     )
     seats.value = res.data.map(s => reactive({
@@ -131,7 +131,7 @@ async function confirmSelection() {
 
   try {
     for (const seat of selectedSeats.value) {
-      await axios.post('http://localhost:8081/api/seats/lock', null, {
+      await axios.post('https://thesisproject-pqtl.onrender.com/api/seats/lock', null, {
         params: { seatId: seat.id, userId }
       })
       seat.status = 'LOCKED'
@@ -155,7 +155,7 @@ async function cancelSelection() {
     // Unlock seats on backend
     for (const seat of selectedSeats.value) {
       try {
-        await axios.post('http://localhost:8081/api/seats/unlock', null, {
+        await axios.post('https://thesisproject-pqtl.onrender.com/api/seats/unlock', null, {
           params: { seatId: seat.id, userId }
         })
         seat.status = 'AVAILABLE'
@@ -192,7 +192,7 @@ function emitSelectedSeats() {
 async function refreshSeatStatus() {
   try {
     const res = await axios.get(
-      `http://localhost:8081/api/seats/concert/${props.concertId}/zone`,
+      `https://thesisproject-pqtl.onrender.com/api/seats/concert/${props.concertId}/zone`,
       { params: { zoneName: props.zoneName } }
     )
     res.data.forEach(s => {

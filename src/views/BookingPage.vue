@@ -75,7 +75,7 @@ function getTextColor(hex) {
 
 onMounted(async () => {
   try {
-    const res = await axios.get("http://localhost:8081/api/concerts")
+    const res = await axios.get("https://thesisproject-pqtl.onrender.com/api/concerts")
     showTimes.value = res.data
 
     if (concertIdFromRoute) {
@@ -123,7 +123,7 @@ async function confirmBooking() {
   for (const seat of selectedSeats.value) {
     try {
       const res = await axios.post(
-        "http://localhost:8081/api/seats/lock",
+        "https://thesisproject-pqtl.onrender.com/api/seats/lock",
         null,
         {
           params: { seatId: seat.id, userId }

@@ -80,7 +80,7 @@ const fetchBookingHistory = async () => {
 
   try {
     const res = await axios.get(
-      `http://localhost:8081/bookings/history/${encodeURIComponent(
+      `https://thesisproject-pqtl.onrender.com/bookings/history/${encodeURIComponent(
         userEmail.value
       )}`
     )
@@ -109,7 +109,7 @@ const payWithAlipay = async (booking) => {
   }
 
   try {
-    const res = await axios.post("http://localhost:8081/payment/create", {
+    const res = await axios.post("https://thesisproject-pqtl.onrender.com/payment/create", {
       userId: userId.value,
       concertId: booking.concertId,
       seatIds: booking.seatIds, 
@@ -143,7 +143,7 @@ const pollPaymentStatus = (booking) => {
   booking.pollInterval = setInterval(async () => {
     try {
       const res = await axios.get(
-        `http://localhost:8081/payment/status/${booking.paymentId}`
+        `https://thesisproject-pqtl.onrender.com/payment/status/${booking.paymentId}`
       )
 
       if (res.data === "COMPLETED") {

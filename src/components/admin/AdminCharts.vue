@@ -79,7 +79,7 @@ const options = {
 // ---------------- FETCH ----------------
 async function fetchAnalytics() {
   try {
-    const res = await axios.get("http://localhost:8081/admin/analytics")
+    const res = await axios.get("https://thesisproject-pqtl.onrender.com/admin/analytics")
     const data = res.data || {}
 
     // ✅ SAFE FALLBACKS

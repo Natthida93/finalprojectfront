@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_URL = 'http://localhost:8081/api/auth'
+const API_URL = 'https://thesisproject-pqtl.onrender.com/api/auth'
 
 export const register = (userData) => {
   return axios.post(`${API_URL}/register`, userData)

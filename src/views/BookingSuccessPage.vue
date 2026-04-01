@@ -85,13 +85,13 @@ async function fetchBooking() {
     let rawBooking = null;
 
     if (paymentId) {
-      const res = await axios.get(`http://localhost:8081/bookings/by-payment/${paymentId}`);
+      const res = await axios.get(`https://thesisproject-pqtl.onrender.com/bookings/by-payment/${paymentId}`);
       console.log("[BookingSuccess] res.data:", res.data);  // Log the response data
       rawBooking = res.data.booking || res.data;
     }
 
     if (!rawBooking && userEmail) {
-      const res = await axios.get(`http://localhost:8081/bookings/history/${userEmail}`);
+      const res = await axios.get(`https://thesisproject-pqtl.onrender.com/bookings/history/${userEmail}`);
       console.log("[BookingSuccess] History res.data:", res.data);  // Log the history response data
       rawBooking = res.data?.length ? res.data[res.data.length - 1] : null;
     }

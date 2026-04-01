@@ -16,7 +16,7 @@ const formatDate = (date) => {
 onMounted(async () => {
   try {
     const response = await fetch(
-      `http://localhost:8081/api/concerts/${route.params.id}`
+      `https://thesisproject-pqtl.onrender.com/api/concerts/${route.params.id}`
     )
     if (!response.ok) throw new Error("Failed to fetch concert")
     event.value = await response.json()

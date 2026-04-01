@@ -146,8 +146,8 @@ async function createOrRefreshQR(isRefresh = false) {
   };
 
   const url = isRefresh
-    ? `http://localhost:8081/payment/refresh/${paymentId}`
-    : "http://localhost:8081/payment/create";
+    ? `https://thesisproject-pqtl.onrender.com/payment/refresh/${paymentId}`
+    : "https://thesisproject-pqtl.onrender.com/payment/create";
 
   try {
     const res = await axios.post(url, payload);
@@ -229,7 +229,7 @@ function startPolling(id) {
     }
 
     try {
-      const res = await axios.get(`http://localhost:8081/payment/status/${id}`);
+      const res = await axios.get(`https://thesisproject-pqtl.onrender.com/payment/status/${id}`);
       paymentStatus.value = res.data;
 
       if (res.data === "COMPLETED") {
@@ -253,7 +253,7 @@ onMounted(() => {
   const concertId = JSON.parse(localStorage.getItem("paymentConcertId") || "null");
 
   if (concertId) {
-    axios.get(`http://localhost:8081/api/concerts/${concertId}`)
+    axios.get(`https://thesisproject-pqtl.onrender.com/api/concerts/${concertId}`)
       .then(res => (concert.value = res.data))
       .catch(err => console.error("Failed to fetch concert", err));
   }

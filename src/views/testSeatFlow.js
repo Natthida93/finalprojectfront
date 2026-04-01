@@ -1,5 +1,5 @@
 import axios from 'axios';
-const API_BASE = 'http://localhost:8081/api';
+const API_BASE = 'https://thesisproject-pqtl.onrender.com/api';
 const userEmail = 'kainem@gmail.com'; // your user
 const seatIds = [6, "A6"]; // replace with real seat IDs to test
 const concertId = 1; // replace with a valid concert ID

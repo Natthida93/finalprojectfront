@@ -38,7 +38,7 @@ const loading = ref(true)
 // ---------------- FETCH ----------------
 async function fetchStats() {
   try {
-    const res = await axios.get("http://localhost:8081/admin/stats")
+    const res = await axios.get("https://thesisproject-pqtl.onrender.com/admin/stats")
     stats.value = res.data
   } catch (err) {
     console.error("[AdminStats] error:", err)

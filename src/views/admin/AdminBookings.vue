@@ -66,7 +66,7 @@ const loading = ref(true)
 // ---------------- FETCH ----------------
 async function fetchBookings() {
   try {
-    const res = await axios.get("http://localhost:8081/admin/bookings")
+    const res = await axios.get("https://thesisproject-pqtl.onrender.com/admin/bookings")
     bookings.value = res.data
   } catch (err) {
     console.error("[AdminBookings] error:", err)
@@ -83,7 +83,7 @@ async function deleteBooking(id) {
   if (!confirmDelete) return
 
   try {
-    await axios.delete(`http://localhost:8081/admin/bookings/${id}`)
+    await axios.delete(`https://thesisproject-pqtl.onrender.com/admin/bookings/${id}`)
 
     // remove from UI
     bookings.value = bookings.value.filter(b => b.id !== id)

@@ -15,7 +15,7 @@ const selectedEvent = ref(null)
 // Fetch events
 onMounted(async () => {
   try {
-    const response = await fetch('http://localhost:8081/api/concerts')
+    const response = await fetch('https://thesisproject-pqtl.onrender.com/api/concerts')
     const data = await response.json()
     events.value = data
   } catch (error) {

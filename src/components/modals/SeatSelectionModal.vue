@@ -108,7 +108,7 @@ async function confirmBooking() {
 
   for (const seat of [...selectedSeats.value]) {
     try {
-      await axios.post('http://localhost:8081/api/seats/lock', null, {
+      await axios.post('https://thesisproject-pqtl.onrender.com/api/seats/lock', null, {
         params: { seatId: seat.id, userEmail }
       })
     } catch (err) {
@@ -147,7 +147,7 @@ async function confirmBooking() {
 // Fetch total available seats per zone
 async function fetchAvailableSeats() {
   try {
-    const res = await axios.get(`http://localhost:8081/api/concerts/${props.event.id}/available-seats`)
+    const res = await axios.get(`https://thesisproject-pqtl.onrender.com/api/concerts/${props.event.id}/available-seats`)
     const data = res.data
     zones.value.forEach(zone => {
       zone.available = data[zone.name] || 0

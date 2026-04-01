@@ -10,7 +10,7 @@ const selectedCategory = ref('All')
 // Fetch all events
 onMounted(async () => {
   try {
-    const res = await fetch('http://localhost:8081/api/concerts')
+    const res = await fetch('https://thesisproject-pqtl.onrender.com/api/concerts')
     events.value = await res.json()
   } catch (err) {
     console.error('Failed to fetch events:', err)

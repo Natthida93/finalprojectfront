@@ -49,7 +49,7 @@ const loading = ref(true)
 // ---------------- FETCH ----------------
 async function fetchUsers() {
   try {
-    const res = await axios.get("http://localhost:8081/admin/users")
+    const res = await axios.get("https://thesisproject-pqtl.onrender.com/admin/users")
     users.value = res.data
   } catch (err) {
     console.error("[AdminUsers] error:", err)
@@ -64,7 +64,7 @@ async function deleteUser(id) {
   if (!confirmDelete) return
 
   try {
-    await axios.delete(`http://localhost:8081/admin/users/${id}`)
+    await axios.delete(`https://thesisproject-pqtl.onrender.com/admin/users/${id}`)
 
     users.value = users.value.filter(u => u.id !== id)
 

@@ -75,7 +75,7 @@ const loading = ref(true)
 // ---------------- FETCH ----------------
 async function fetchPayments() {
   try {
-    const res = await axios.get("http://localhost:8081/admin/payments")
+    const res = await axios.get("https://thesisproject-pqtl.onrender.com/admin/payments")
     payments.value = res.data
   } catch (err) {
     console.error("[AdminPayments] error:", err)
@@ -90,7 +90,7 @@ async function deletePayment(id) {
   if (!confirmDelete) return
 
   try {
-    await axios.delete(`http://localhost:8081/admin/payments/${id}`)
+    await axios.delete(`https://thesisproject-pqtl.onrender.com/admin/payments/${id}`)
     payments.value = payments.value.filter(p => p.id !== id)
   } catch (err) {
     console.error("[Delete] error:", err)

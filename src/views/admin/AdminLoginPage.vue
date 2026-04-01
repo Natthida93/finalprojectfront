@@ -23,7 +23,7 @@ const router = useRouter()
 
 async function login() {
   try {
-    const res = await axios.post("http://localhost:8081/admin/login", {
+    const res = await axios.post("https://thesisproject-pqtl.onrender.com/admin/login", {
       email: email.value,
       password: password.value
     })
