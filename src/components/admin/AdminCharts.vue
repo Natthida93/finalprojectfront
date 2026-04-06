@@ -1,125 +1,173 @@
 <template>
   <div class="charts">
     <h3>📊 Analytics</h3>
-    <div v-if="loading">Loading charts...</div>
 
-    <template v-else>
-      <div class="chart-box">
-        <h4>Revenue Overview</h4>
-        <Bar v-if="revenueData.datasets.length" :chart-data="revenueData" :chart-options="options" />
-      </div>
+    <div class="chart-box">
+      <h4>Revenue Overview</h4>
+      <Bar
+        v-if="revenueData.datasets.length"
+        :chart-data="revenueData"
+        :chart-options="barOptions"
+      />
+    </div>
 
-      <div class="chart-box">
-        <h4>Bookings per Concert</h4>
-        <Bar v-if="bookingData.datasets.length" :chart-data="bookingData" :chart-options="options" />
-      </div>
+    <div class="chart-box">
+      <h4>Bookings per Concert</h4>
+      <Bar
+        v-if="bookingData.datasets.length"
+        :chart-data="bookingData"
+        :chart-options="barOptions"
+      />
+    </div>
 
-      <div class="chart-box">
-        <h4>Payment Status</h4>
-        <Pie v-if="paymentData.datasets.length" :chart-data="paymentData" :chart-options="pieOptions" />
-      </div>
-    </template>
+    <div class="chart-box">
+      <h4>Payment Status</h4>
+      <Pie
+        v-if="paymentData.datasets.length"
+        :chart-data="paymentData"
+        :chart-options="pieOptions"
+      />
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue"
-import { Chart as ChartJS, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, ArcElement } from "chart.js"
+import { ref, watch } from "vue"
+import {
+  Chart as ChartJS,
+  Title,
+  Tooltip,
+  Legend,
+  BarElement,
+  CategoryScale,
+  LinearScale,
+  ArcElement
+} from "chart.js"
 import { Bar, Pie } from "vue-chartjs"
 
 ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, ArcElement)
 
+const props = defineProps({
+  stats: { type: Object, required: true }
+})
+
+// ---------------- OPTIONS ----------------
+const barOptions = {
+  responsive: true,
+  plugins: { legend: { position: "top" } },
+  scales: { y: { beginAtZero: true } }
+}
+
+const pieOptions = {
+  responsive: true,
+  plugins: { legend: { position: "top" } }
+}
+
+// ---------------- DATA ----------------
 const revenueData = ref({ labels: [], datasets: [] })
 const bookingData = ref({ labels: [], datasets: [] })
 const paymentData = ref({ labels: [], datasets: [] })
-const loading = ref(true)
 
-const options = { responsive: true, plugins: { legend: { position: "top" } }, scales: { y: { beginAtZero: true } } }
-const pieOptions = { responsive: true, plugins: { legend: { position: "top" } } }
-
-async function fetchAnalytics() {
-  try {
-    const res = await fetch("https://thesisproject-pqtl.onrender.com/admin/analytics")
-    const data = await res.json()
-
-    const revenue = data.revenue || []
-    const bookings = data.bookings || []
-    const payments = data.payments || {}
-
-    revenueData.value = {
-      labels: revenue.map(r => r.date || ""),
-      datasets: [{
-        label: "Revenue",
-        data: revenue.map(r => Number(r.amount || 0)),
-        backgroundColor: [
-          "rgba(75, 192, 192, 0.7)",
-          "rgba(54, 162, 235, 0.7)",
-          "rgba(255, 206, 86, 0.7)",
-          "rgba(255, 99, 132, 0.7)"
-        ],
-        borderColor: [
-          "rgba(75, 192, 192, 1)",
-          "rgba(54, 162, 235, 1)",
-          "rgba(255, 206, 86, 1)",
-          "rgba(255, 99, 132, 1)"
-        ],
-        borderWidth: 1
-      }]
-    }
-
-    bookingData.value = {
-      labels: bookings.map(b => b.concert || ""),
-      datasets: [{
-        label: "Bookings",
-        data: bookings.map(b => Number(b.count || 0)),
-        backgroundColor: [
-          "rgba(54, 162, 235, 0.7)",
-          "rgba(75, 192, 192, 0.7)",
-          "rgba(255, 206, 86, 0.7)"
-        ],
-        borderColor: [
-          "rgba(54, 162, 235, 1)",
-          "rgba(75, 192, 192, 1)",
-          "rgba(255, 206, 86, 1)"
-        ],
-        borderWidth: 1
-      }]
-    }
-
-    paymentData.value = {
-      labels: ["Completed", "Pending", "Failed"],
-      datasets: [{
-        label: "Payments",
-        data: [
-          Number(payments.completed || 0),
-          Number(payments.pending || 0),
-          Number(payments.failed || 0)
-        ],
-        backgroundColor: [
-          "rgba(75, 192, 192, 0.7)",
-          "rgba(255, 206, 86, 0.7)",
-          "rgba(255, 99, 132, 0.7)"
-        ],
-        borderColor: [
-          "rgba(75, 192, 192, 1)",
-          "rgba(255, 206, 86, 1)",
-          "rgba(255, 99, 132, 1)"
-        ],
-        borderWidth: 1
-      }]
-    }
-  } catch (err) {
-    console.error("Analytics fetch error:", err)
-  } finally {
-    loading.value = false
-  }
+// ---------------- HELPER: DYNAMIC COLORS ----------------
+function generateColors(length) {
+  const baseColors = [
+    "75, 192, 192",
+    "54, 162, 235",
+    "255, 206, 86",
+    "255, 99, 132",
+    "153, 102, 255",
+    "255, 159, 64"
+  ]
+  return Array.from({ length }, (_, i) => `rgba(${baseColors[i % baseColors.length]}, 0.7)`)
 }
 
-onMounted(fetchAnalytics)
+function generateBorderColors(length) {
+  return generateColors(length).map(c => c.replace("0.7", "1"))
+}
+
+// ---------------- WATCH STATS ----------------
+watch(
+  () => props.stats,
+  (stats) => {
+    if (!stats) return
+
+    // Revenue chart
+    if (stats.revenueData && stats.revenueData.length) {
+      const revenue = stats.revenueData
+      const colors = generateColors(revenue.length)
+      revenueData.value = {
+        labels: revenue.map(r => r.date || ""),
+        datasets: [
+          {
+            label: "Revenue",
+            data: revenue.map(r => Number(r.amount || 0)),
+            backgroundColor: colors,
+            borderColor: generateBorderColors(revenue.length),
+            borderWidth: 1
+          }
+        ]
+      }
+    }
+
+    // Bookings chart
+    if (stats.bookingData && stats.bookingData.length) {
+      const bookings = stats.bookingData
+      const colors = generateColors(bookings.length)
+      bookingData.value = {
+        labels: bookings.map(b => b.concert || ""),
+        datasets: [
+          {
+            label: "Bookings",
+            data: bookings.map(b => Number(b.count || 0)),
+            backgroundColor: colors,
+            borderColor: generateBorderColors(bookings.length),
+            borderWidth: 1
+          }
+        ]
+      }
+    }
+
+    // Payments chart
+    if (stats.payments) {
+      const payments = stats.payments
+      const colors = generateColors(3)
+      paymentData.value = {
+        labels: ["Completed", "Pending", "Failed"],
+        datasets: [
+          {
+            label: "Payments",
+            data: [
+              Number(payments.completed || 0),
+              Number(payments.pending || 0),
+              Number(payments.failed || 0)
+            ],
+            backgroundColor: colors,
+            borderColor: generateBorderColors(3),
+            borderWidth: 1
+          }
+        ]
+      }
+    }
+  },
+  { immediate: true }
+)
 </script>
 
 <style scoped>
-.charts { margin-top: 20px; }
-.chart-box { margin: 20px 0; background: #f8f9fa; padding: 15px; border-radius: 10px; }
-canvas { width: 100% !important; height: 300px !important; }
+.charts {
+  margin-top: 20px;
+}
+
+.chart-box {
+  margin: 20px 0;
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 10px;
+}
+
+
+canvas {
+  width: 100% !important;
+  height: 300px !important;
+}
 </style>
