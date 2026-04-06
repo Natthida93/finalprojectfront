@@ -7,12 +7,18 @@
     <template v-else>
       <div class="chart-box">
         <h4>Revenue Overview</h4>
-        <BarChart v-if="revenueData.datasets.length" :chart-data="revenueData" :chart-options="barOptions" />
+        <BarChart v-if="revenueData.datasets.length" 
+        :chart-data="revenueData"
+        :chart-options="barOptions" />
       </div>
 
       <div class="chart-box">
         <h4>Bookings per Concert</h4>
-        <BarChart v-if="bookingData.datasets.length" :chart-data="bookingData" :chart-options="barOptions" />
+       <BarChart 
+  v-if="!loading && revenueData.datasets?.length" 
+  :chart-data="revenueData" 
+  :chart-options="barOptions" 
+/>
       </div>
 
       <div class="chart-box">
@@ -45,9 +51,9 @@ const BarChart = defineChartComponent(VueChart, "bar")
 const PieChart = defineChartComponent(VueChart, "pie")
 
 // ----------------- State -----------------
-const revenueData = ref({ labels: [], datasets: [] })
-const bookingData = ref({ labels: [], datasets: [] })
-const paymentData = ref({ labels: [], datasets: [] })
+const revenueData = ref({ labels: [], datasets: [{ label: "", data: [], backgroundColor: "" }] })
+const bookingData = ref({ labels: [], datasets: [{ label: "", data: [], backgroundColor: "" }] })
+const paymentData = ref({ labels: [], datasets: [{ label: "", data: [], backgroundColor: [] }] })
 const loading = ref(true)
 
 // ----------------- Chart Options -----------------
