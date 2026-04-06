@@ -2,25 +2,28 @@
   <div class="admin-dashboard">
     <h1>📊 Admin Dashboard</h1>
 
+    <!-- Loading indicator -->
     <div v-if="loading">Loading stats...</div>
 
+    <!-- Stats cards -->
     <div v-else class="stats">
       <div class="card">👤 Users: {{ stats.users }}</div>
       <div class="card">📖 Bookings: {{ stats.bookings }}</div>
       <div class="card">💰 Revenue: ${{ stats.revenue }}</div>
       <div class="card">💳 Payments: {{ stats.payments }}</div>
     </div>
+
+    <!-- Charts -->
     <AdminCharts v-if="!loading && stats" :stats="stats" />
 
     <h2>Manage</h2>
 
+    <!-- Navigation cards -->
     <div class="cards">
       <div class="card nav" @click="go('/admin/bookings')">📖 Bookings</div>
       <div class="card nav" @click="go('/admin/users')">👤 Users</div>
       <div class="card nav" @click="go('/admin/payments')">💰 Payments</div>
     </div>
-
-    
   </div>
 </template>
 
@@ -35,11 +38,11 @@ const router = useRouter()
 const stats = ref({})
 const loading = ref(true)
 
-// ---------------- FETCH ----------------
+// ---------------- FETCH STATS ----------------
 async function fetchStats() {
   try {
     const res = await axios.get("https://thesisproject-pqtl.onrender.com/admin/stats")
-    stats.value = res.data
+    stats.value = res.data || {}
   } catch (err) {
     console.error("[AdminStats] error:", err)
   } finally {
@@ -47,7 +50,7 @@ async function fetchStats() {
   }
 }
 
-// ---------------- NAV ----------------
+// ---------------- NAVIGATION ----------------
 function go(path) {
   router.push(path)
 }
@@ -67,11 +70,13 @@ onMounted(() => {
   display: flex;
   gap: 20px;
   margin: 20px 0;
+  flex-wrap: wrap;
 }
 
 .cards {
   display: flex;
   gap: 20px;
+  flex-wrap: wrap;
 }
 
 .card {
@@ -79,10 +84,13 @@ onMounted(() => {
   background: #54a0ff;
   color: white;
   border-radius: 10px;
+  min-width: 120px;
+  text-align: center;
 }
 
 .nav {
   cursor: pointer;
+  transition: background 0.2s;
 }
 
 .nav:hover {
