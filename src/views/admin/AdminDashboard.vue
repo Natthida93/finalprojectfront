@@ -96,4 +96,4 @@ onMounted(() => {
 .nav:hover {
   background: #2e86de;
 }
-</style>
+</style> 
