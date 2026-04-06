@@ -1,41 +1,44 @@
 <template>
   <div class="charts">
     <h3>📊 Analytics</h3>
+    <div v-if="loading">Loading charts...</div>
 
-    <!-- Revenue -->
-    <div class="chart-box">
-      <h4>Revenue Overview</h4>
-      <Bar
-        v-if="revenueData.datasets.length"
-        :chart-data="revenueData"
-        :chart-options="barOptions"
-      />
-    </div>
+    <template v-else>
+      <!-- Revenue Chart -->
+      <div class="chart-box">
+        <h4>Revenue Overview</h4>
+        <Bar
+          v-if="revenueData.datasets.length"
+          :chart-data="revenueData"
+          :chart-options="options"
+        />
+      </div>
 
-    <!-- Bookings -->
-    <div class="chart-box">
-      <h4>Bookings Overview</h4>
-      <Bar
-        v-if="bookingData.datasets.length"
-        :chart-data="bookingData"
-        :chart-options="barOptions"
-      />
-    </div>
+      <!-- Bookings Chart -->
+      <div class="chart-box">
+        <h4>Bookings per Concert</h4>
+        <Bar
+          v-if="bookingData.datasets.length"
+          :chart-data="bookingData"
+          :chart-options="options"
+        />
+      </div>
 
-    <!-- Payments -->
-    <div class="chart-box">
-      <h4>Payment Status</h4>
-      <Pie
-        v-if="paymentData.datasets.length"
-        :chart-data="paymentData"
-        :chart-options="pieOptions"
-      />
-    </div>
+      <!-- Payments Chart -->
+      <div class="chart-box">
+        <h4>Payment Status</h4>
+        <Pie
+          v-if="paymentData.datasets.length"
+          :chart-data="paymentData"
+          :chart-options="pieOptions"
+        />
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref, watch } from "vue"
+import { ref, onMounted } from "vue"
 import {
   Chart as ChartJS,
   Title,
@@ -50,12 +53,14 @@ import { Bar, Pie } from "vue-chartjs"
 
 ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, ArcElement)
 
-const props = defineProps({
-  stats: { type: Object, required: true }
-})
+// ---------------- STATE ----------------
+const revenueData = ref({ labels: [], datasets: [] })
+const bookingData = ref({ labels: [], datasets: [] })
+const paymentData = ref({ labels: [], datasets: [] })
+const loading = ref(true)
 
 // ---------------- OPTIONS ----------------
-const barOptions = {
+const options = {
   responsive: true,
   plugins: { legend: { position: "top" } },
   scales: { y: { beginAtZero: true } }
@@ -66,12 +71,7 @@ const pieOptions = {
   plugins: { legend: { position: "top" } }
 }
 
-// ---------------- DATA ----------------
-const revenueData = ref({ labels: [], datasets: [] })
-const bookingData = ref({ labels: [], datasets: [] })
-const paymentData = ref({ labels: [], datasets: [] })
-
-// ---------------- HELPER: COLORS ----------------
+// ---------------- HELPER: DYNAMIC COLORS ----------------
 function generateColors(length) {
   const baseColors = [
     "75, 192, 192",
@@ -88,61 +88,64 @@ function generateBorderColors(length) {
   return generateColors(length).map(c => c.replace("0.7", "1"))
 }
 
-// ---------------- WATCH STATS ----------------
-watch(
-  () => props.stats,
-  (stats) => {
-    if (!stats) return
+// ---------------- FETCH ANALYTICS ----------------
+async function fetchAnalytics() {
+  try {
+    const res = await fetch("https://thesisproject-pqtl.onrender.com/admin/analytics")
+    const data = await res.json()
 
-    // Revenue - single bar
+    const revenue = data.revenue || []
+    const bookings = data.bookings || []
+    const payments = data.payments || {}
+
+    // Revenue Chart
     revenueData.value = {
-      labels: ["Revenue"],
-      datasets: [
-        {
-          label: "Revenue",
-          data: [Number(stats.revenue || 0)],
-          backgroundColor: generateColors(1),
-          borderColor: generateBorderColors(1),
-          borderWidth: 1
-        }
-      ]
+      labels: revenue.map(r => r.date || ""),
+      datasets: [{
+        label: "Revenue",
+        data: revenue.map(r => Number(r.amount || 0)),
+        backgroundColor: generateColors(revenue.length),
+        borderColor: generateBorderColors(revenue.length),
+        borderWidth: 1
+      }]
     }
 
-    // Bookings - single bar
+    // Bookings Chart
     bookingData.value = {
-      labels: ["Bookings"],
-      datasets: [
-        {
-          label: "Bookings",
-          data: [Number(stats.bookings || 0)],
-          backgroundColor: generateColors(1),
-          borderColor: generateBorderColors(1),
-          borderWidth: 1
-        }
-      ]
+      labels: bookings.map(b => b.concert || ""),
+      datasets: [{
+        label: "Bookings",
+        data: bookings.map(b => Number(b.count || 0)),
+        backgroundColor: generateColors(bookings.length),
+        borderColor: generateBorderColors(bookings.length),
+        borderWidth: 1
+      }]
     }
 
-    // Payments - pie chart
-    const payments = stats.payments || {}
+    // Payments Pie Chart
     paymentData.value = {
       labels: ["Completed", "Pending", "Failed"],
-      datasets: [
-        {
-          label: "Payments",
-          data: [
-            Number(payments.completed || 0),
-            Number(payments.pending || 0),
-            Number(payments.failed || 0)
-          ],
-          backgroundColor: generateColors(3),
-          borderColor: generateBorderColors(3),
-          borderWidth: 1
-        }
-      ]
+      datasets: [{
+        label: "Payments",
+        data: [
+          Number(payments.completed || 0),
+          Number(payments.pending || 0),
+          Number(payments.failed || 0)
+        ],
+        backgroundColor: generateColors(3),
+        borderColor: generateBorderColors(3),
+        borderWidth: 1
+      }]
     }
-  },
-  { immediate: true }
-)
+
+  } catch (err) {
+    console.error("Analytics fetch error:", err)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(fetchAnalytics)
 </script>
 
 <style scoped>
