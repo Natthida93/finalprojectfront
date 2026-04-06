@@ -2,6 +2,7 @@
   <div class="charts">
     <h3>📊 Analytics</h3>
 
+    <!-- Revenue -->
     <div class="chart-box">
       <h4>Revenue Overview</h4>
       <Bar
@@ -11,8 +12,9 @@
       />
     </div>
 
+    <!-- Bookings -->
     <div class="chart-box">
-      <h4>Bookings per Concert</h4>
+      <h4>Bookings Overview</h4>
       <Bar
         v-if="bookingData.datasets.length"
         :chart-data="bookingData"
@@ -20,6 +22,7 @@
       />
     </div>
 
+    <!-- Payments -->
     <div class="chart-box">
       <h4>Payment Status</h4>
       <Pie
@@ -68,7 +71,7 @@ const revenueData = ref({ labels: [], datasets: [] })
 const bookingData = ref({ labels: [], datasets: [] })
 const paymentData = ref({ labels: [], datasets: [] })
 
-// ---------------- HELPER: DYNAMIC COLORS ----------------
+// ---------------- HELPER: COLORS ----------------
 function generateColors(length) {
   const baseColors = [
     "75, 192, 192",
@@ -91,62 +94,51 @@ watch(
   (stats) => {
     if (!stats) return
 
-    // Revenue chart
-    if (stats.revenueData && stats.revenueData.length) {
-      const revenue = stats.revenueData
-      const colors = generateColors(revenue.length)
-      revenueData.value = {
-        labels: revenue.map(r => r.date || ""),
-        datasets: [
-          {
-            label: "Revenue",
-            data: revenue.map(r => Number(r.amount || 0)),
-            backgroundColor: colors,
-            borderColor: generateBorderColors(revenue.length),
-            borderWidth: 1
-          }
-        ]
-      }
+    // Revenue - single bar
+    revenueData.value = {
+      labels: ["Revenue"],
+      datasets: [
+        {
+          label: "Revenue",
+          data: [Number(stats.revenue || 0)],
+          backgroundColor: generateColors(1),
+          borderColor: generateBorderColors(1),
+          borderWidth: 1
+        }
+      ]
     }
 
-    // Bookings chart
-    if (stats.bookingData && stats.bookingData.length) {
-      const bookings = stats.bookingData
-      const colors = generateColors(bookings.length)
-      bookingData.value = {
-        labels: bookings.map(b => b.concert || ""),
-        datasets: [
-          {
-            label: "Bookings",
-            data: bookings.map(b => Number(b.count || 0)),
-            backgroundColor: colors,
-            borderColor: generateBorderColors(bookings.length),
-            borderWidth: 1
-          }
-        ]
-      }
+    // Bookings - single bar
+    bookingData.value = {
+      labels: ["Bookings"],
+      datasets: [
+        {
+          label: "Bookings",
+          data: [Number(stats.bookings || 0)],
+          backgroundColor: generateColors(1),
+          borderColor: generateBorderColors(1),
+          borderWidth: 1
+        }
+      ]
     }
 
-    // Payments chart
-    if (stats.payments) {
-      const payments = stats.payments
-      const colors = generateColors(3)
-      paymentData.value = {
-        labels: ["Completed", "Pending", "Failed"],
-        datasets: [
-          {
-            label: "Payments",
-            data: [
-              Number(payments.completed || 0),
-              Number(payments.pending || 0),
-              Number(payments.failed || 0)
-            ],
-            backgroundColor: colors,
-            borderColor: generateBorderColors(3),
-            borderWidth: 1
-          }
-        ]
-      }
+    // Payments - pie chart
+    const payments = stats.payments || {}
+    paymentData.value = {
+      labels: ["Completed", "Pending", "Failed"],
+      datasets: [
+        {
+          label: "Payments",
+          data: [
+            Number(payments.completed || 0),
+            Number(payments.pending || 0),
+            Number(payments.failed || 0)
+          ],
+          backgroundColor: generateColors(3),
+          borderColor: generateBorderColors(3),
+          borderWidth: 1
+        }
+      ]
     }
   },
   { immediate: true }
@@ -164,7 +156,6 @@ watch(
   padding: 15px;
   border-radius: 10px;
 }
-
 
 canvas {
   width: 100% !important;
