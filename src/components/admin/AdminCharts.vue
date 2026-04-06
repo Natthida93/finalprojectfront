@@ -5,33 +5,21 @@
 
     <template v-else>
       <!-- Revenue Chart -->
-      <div class="chart-box">
+      <div class="chart-box" v-if="revenueData.labels.length && revenueData.datasets.length">
         <h4>Revenue Overview</h4>
-        <Bar
-          v-if="revenueData.datasets.length"
-          :chart-data="revenueData"
-          :chart-options="options"
-        />
+        <Bar :chart-data="revenueData" :chart-options="options" />
       </div>
 
       <!-- Bookings Chart -->
-      <div class="chart-box">
+      <div class="chart-box" v-if="bookingData.labels.length && bookingData.datasets.length">
         <h4>Bookings per Concert</h4>
-        <Bar
-          v-if="bookingData.datasets.length"
-          :chart-data="bookingData"
-          :chart-options="options"
-        />
+        <Bar :chart-data="bookingData" :chart-options="options" />
       </div>
 
       <!-- Payments Chart -->
-      <div class="chart-box">
+      <div class="chart-box" v-if="paymentData.labels.length && paymentData.datasets.length">
         <h4>Payment Status</h4>
-        <Pie
-          v-if="paymentData.datasets.length"
-          :chart-data="paymentData"
-          :chart-options="pieOptions"
-        />
+        <Pie :chart-data="paymentData" :chart-options="pieOptions" />
       </div>
     </template>
   </div>
@@ -54,39 +42,21 @@ import { Bar, Pie } from "vue-chartjs"
 ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, ArcElement)
 
 // ---------------- STATE ----------------
-const revenueData = ref({ labels: [], datasets: [] })
-const bookingData = ref({ labels: [], datasets: [] })
-const paymentData = ref({ labels: [], datasets: [] })
+const revenueData = ref({ labels: [], datasets: [{ label: "Revenue", data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] })
+const bookingData = ref({ labels: [], datasets: [{ label: "Bookings", data: [], backgroundColor: [], borderColor: [], borderWidth: 1 }] })
+const paymentData = ref({ labels: ["Completed", "Pending", "Failed"], datasets: [{ label: "Payments", data: [0, 0, 0], backgroundColor: [], borderColor: [], borderWidth: 1 }] })
 const loading = ref(true)
 
 // ---------------- OPTIONS ----------------
-const options = {
-  responsive: true,
-  plugins: { legend: { position: "top" } },
-  scales: { y: { beginAtZero: true } }
-}
+const options = { responsive: true, plugins: { legend: { position: "top" } }, scales: { y: { beginAtZero: true } } }
+const pieOptions = { responsive: true, plugins: { legend: { position: "top" } } }
 
-const pieOptions = {
-  responsive: true,
-  plugins: { legend: { position: "top" } }
-}
-
-// ---------------- HELPER: DYNAMIC COLORS ----------------
+// ---------------- HELPERS ----------------
 function generateColors(length) {
-  const baseColors = [
-    "75, 192, 192",
-    "54, 162, 235",
-    "255, 206, 86",
-    "255, 99, 132",
-    "153, 102, 255",
-    "255, 159, 64"
-  ]
+  const baseColors = ["75, 192, 192","54, 162, 235","255, 206, 86","255, 99, 132","153, 102, 255","255, 159, 64"]
   return Array.from({ length }, (_, i) => `rgba(${baseColors[i % baseColors.length]}, 0.7)`)
 }
-
-function generateBorderColors(length) {
-  return generateColors(length).map(c => c.replace("0.7", "1"))
-}
+function generateBorderColors(length) { return generateColors(length).map(c => c.replace("0.7", "1")) }
 
 // ---------------- FETCH ANALYTICS ----------------
 async function fetchAnalytics() {
@@ -122,7 +92,7 @@ async function fetchAnalytics() {
       }]
     }
 
-    // Payments Pie Chart
+    // Payments Chart
     paymentData.value = {
       labels: ["Completed", "Pending", "Failed"],
       datasets: [{
@@ -149,19 +119,7 @@ onMounted(fetchAnalytics)
 </script>
 
 <style scoped>
-.charts {
-  margin-top: 20px;
-}
-
-.chart-box {
-  margin: 20px 0;
-  background: #f8f9fa;
-  padding: 15px;
-  border-radius: 10px;
-}
-
-canvas {
-  width: 100% !important;
-  height: 300px !important;
-}
+.charts { margin-top: 20px; }
+.chart-box { margin: 20px 0; background: #f8f9fa; padding: 15px; border-radius: 10px; }
+canvas { width: 100% !important; height: 300px !important; }
 </style>
